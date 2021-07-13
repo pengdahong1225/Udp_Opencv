@@ -100,7 +100,6 @@ string base64Encode(const uchar* Data, int DataByte)
 }
 string Mat2Base64(const cv::Mat &image,string imgType)
 {
-	//Mat转base64
 	std::string img_data;
 	std::vector<uchar> vecImg;
 	std::vector<int> vecCompression_params;
@@ -129,7 +128,7 @@ SOCKET Ret_socket()
 	}
 	struct sockaddr_in addr_Serv;
 	addr_Serv.sin_family = AF_INET;
-	addr_Serv.sin_addr.s_addr = inet_addr("192.168.101.6");
+	addr_Serv.sin_addr.s_addr = inet_addr("192.168.101.9");
 	addr_Serv.sin_port = htons(8000);
 	uint len = sizeof(addr_Serv);
 	bind(sock_fd, (sockaddr*)&addr_Serv, len);
@@ -138,7 +137,6 @@ SOCKET Ret_socket()
 /*数据包分片*/
 bool udp_piece_cut(string ALL_data, std::vector<string>& pieces)
 {
-	//由于此时vector里没有对象，不可以进行下标操作，地址越界
 	pieces.push_back(ALL_data.substr(0, 50000));
 	pieces.push_back(ALL_data.substr(50000));
 	return true;
@@ -157,7 +155,7 @@ int main()
 	//客户端信息
 	sockaddr_in addr_client;
 	addr_client.sin_family = AF_INET;
-	addr_client.sin_addr.s_addr = inet_addr("192.168.101.6");
+	addr_client.sin_addr.s_addr = inet_addr("192.168.101.9");
 	addr_client.sin_port = htons(45454);
 	int len2 = sizeof(addr_client);
 	while (true)
@@ -168,27 +166,32 @@ int main()
 			break;
 		}
 		cvtColor(frame, frame, COLOR_BGR2GRAY);
-		
+		flip(frame, frame, 1);
 		string Base64Data = Mat2Base64(frame, "jpg");
 		cout << "data size = " << Base64Data.size() << endl;
 		bool result = false;
 		std::vector<string> pieces;
-		/*发送base64字节流,如果大于50000字节则先分片*/
+		/*发送base64字节流,如果大于50000字节则分片发送*/
 		if (Base64Data.size() > 50000){
 			result = udp_piece_cut(Base64Data, pieces);
 		}
-		if (result)
+		if (result)//分片
 		{
 			for (uchar i = 0; i < 2; i++)
 			{
 				const char* sendbuf = pieces[i].c_str();
-				if (sendto(sock_fd, sendbuf, strlen(sendbuf), 0, (sockaddr*)&addr_client, len2) == SOCKET_ERROR)
+				if (sendto(sock_fd, sendbuf, strlen(sendbuf), 0, (sockaddr*)&addr_client, len2) != SOCKET_ERROR)
 				{
-					cout << "发送失败" << endl;
+					cout << "分片发送成功" << endl;
 				}
-				else {
-					cout << "发送成功" << endl;
-				}
+			}
+		}
+		else//不分片
+		{
+			const char* sendbuf = Base64Data.c_str();
+			if (sendto(sock_fd, sendbuf, strlen(sendbuf), 0, (sockaddr*)&addr_client, len2) != SOCKET_ERROR)
+			{
+				cout << "不分片发发送成功" << endl;
 			}
 		}
 		int c = waitKey(36);
